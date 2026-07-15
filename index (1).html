@@ -338,14 +338,15 @@
 
   // ---------------- Firebase config ----------------
   // Paste your Firebase project's web config here (see setup steps provided separately).
-  const FIREBASE_CONFIG = {
-    apiKey: "PASTE_YOUR_API_KEY",
-    authDomain: "PASTE_YOUR_PROJECT.firebaseapp.com",
-    projectId: "PASTE_YOUR_PROJECT_ID",
-    storageBucket: "PASTE_YOUR_PROJECT.appspot.com",
-    messagingSenderId: "PASTE_YOUR_SENDER_ID",
-    appId: "PASTE_YOUR_APP_ID"
-  };
+const firebaseConfig = {
+  apiKey: "AIzaSyBXX4nkYfdN0un_PIfh7T_yXepW_0w-bA4",
+  authDomain: "gandalf-reader.firebaseapp.com",
+  projectId: "gandalf-reader",
+  storageBucket: "gandalf-reader.firebasestorage.app",
+  messagingSenderId: "226752247834",
+  appId: "1:226752247834:web:316c53310922b2133bb9a3",
+  measurementId: "G-X0B1RK4X04"
+};
   firebase.initializeApp(FIREBASE_CONFIG);
   const auth = firebase.auth();
   const db = firebase.firestore();
