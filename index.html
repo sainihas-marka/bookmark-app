@@ -1,0 +1,753 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Bookmark — your listening shelf</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#1B1B1E">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Bookmark">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;1,9..144,500&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<style>
+  :root{
+    --ink:#1B1B1E;
+    --ink-soft:#302F2C;
+    --paper:#E8E1CE;
+    --paper-hi:#F1ECDD;
+    --ribbon:#A6373F;
+    --ribbon-dim:#8a2d34;
+    --moss:#5C6E4A;
+    --slate:#5B6472;
+    --gold:#B8935F;
+    --line: rgba(27,27,30,0.12);
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--paper);
+    color:var(--ink);
+    font-family:'Inter',sans-serif;
+    min-height:100vh;
+    -webkit-font-smoothing:antialiased;
+  }
+  ::selection{background:var(--gold); color:var(--ink);}
+  .app{max-width:1000px;margin:0 auto;padding:36px 24px 80px;}
+
+  /* ---------- Header ---------- */
+  .app-header{display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:34px;gap:16px;flex-wrap:wrap;}
+  .brand{display:flex;align-items:center;gap:14px;}
+  .brand-mark{width:34px;height:44px;position:relative;flex-shrink:0;}
+  .brand-mark::before{
+    content:"";position:absolute;inset:0;
+    background:var(--ink);border-radius:2px 5px 5px 2px;
+  }
+  .brand-mark::after{
+    content:"";position:absolute;top:0;right:6px;width:9px;height:26px;
+    background:var(--ribbon);
+    clip-path: polygon(0 0, 100% 0, 100% 100%, 50% 78%, 0 100%);
+  }
+  .brand h1{font-family:'Fraunces',serif;font-weight:600;font-size:26px;margin:0;letter-spacing:-0.01em;}
+  .brand p{margin:2px 0 0;font-size:12.5px;color:var(--slate);font-family:'IBM Plex Mono',monospace;letter-spacing:0.02em;}
+
+  .upload-btn{
+    background:var(--ink);color:var(--paper-hi);border:none;
+    font-family:'Inter',sans-serif;font-weight:600;font-size:14px;
+    padding:12px 20px;border-radius:8px;cursor:pointer;
+    display:flex;align-items:center;gap:8px;
+    transition:transform .15s ease, background .15s ease;
+  }
+  .upload-btn:hover{background:var(--ink-soft); transform:translateY(-1px);}
+  .upload-btn:active{transform:translateY(0);}
+  .upload-btn:focus-visible, button:focus-visible, select:focus-visible, input:focus-visible{
+    outline:3px solid var(--gold); outline-offset:2px;
+  }
+  #fileInput{display:none;}
+
+  /* ---------- Shelves ---------- */
+  .shelf{margin-bottom:38px;}
+  .shelf-title{
+    font-family:'IBM Plex Mono',monospace;font-size:12.5px;letter-spacing:0.08em;
+    text-transform:uppercase;color:var(--slate);margin:0 0 14px;
+    display:flex;align-items:center;gap:10px;
+  }
+  .shelf-title::after{content:"";flex:1;height:1px;background:var(--line);}
+  .shelf-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:16px;}
+
+  .book-card{
+    position:relative;background:var(--paper-hi);border:1px solid var(--line);
+    border-radius:10px;padding:18px 16px 16px;cursor:pointer;
+    transition:transform .15s ease, box-shadow .15s ease;
+    overflow:hidden;
+  }
+  .book-card:hover{transform:translateY(-3px);box-shadow:0 10px 24px rgba(27,27,30,0.14);}
+  .book-card .ribbon-tab{
+    position:absolute;top:0;right:18px;width:14px;
+    background:var(--ribbon);
+    clip-path: polygon(0 0, 100% 0, 100% 100%, 50% 82%, 0 100%);
+  }
+  .book-card .title{
+    font-family:'Fraunces',serif;font-size:17px;font-weight:500;line-height:1.25;
+    margin:6px 26px 10px 0; word-break:break-word;
+  }
+  .book-card .meta{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--slate);margin:0;}
+  .book-card .progress-track{height:4px;background:var(--line);border-radius:2px;margin-top:12px;overflow:hidden;}
+  .book-card .progress-fill{height:100%;background:var(--moss);}
+  .book-card .delete-x{
+    position:absolute;bottom:10px;right:10px;background:none;border:none;
+    color:var(--slate);font-size:16px;cursor:pointer;padding:4px 6px;line-height:1;opacity:0;
+    transition:opacity .12s ease;
+  }
+  .book-card:hover .delete-x{opacity:0.6;}
+  .book-card .delete-x:hover{opacity:1;color:var(--ribbon);}
+
+  .empty-state{
+    border:1px dashed var(--line);border-radius:10px;padding:28px;text-align:center;
+    color:var(--slate);font-size:14px;
+  }
+  .empty-state b{color:var(--ink);}
+
+  .parsing-card{
+    background:var(--paper-hi);border:1px solid var(--line);border-radius:10px;
+    padding:16px;font-family:'IBM Plex Mono',monospace;font-size:12.5px;color:var(--slate);
+    margin-bottom:16px; display:flex; align-items:center; gap:10px;
+  }
+  .spinner{width:14px;height:14px;border-radius:50%;border:2px solid var(--line);border-top-color:var(--ribbon);animation:spin 0.8s linear infinite;flex-shrink:0;}
+  @keyframes spin{to{transform:rotate(360deg);}}
+
+  /* ---------- Player ---------- */
+  .player{display:none;}
+  .player.active{display:block;}
+  .library-view.hidden{display:none;}
+
+  .back-btn{
+    background:none;border:none;color:var(--slate);font-family:'IBM Plex Mono',monospace;
+    font-size:12.5px;cursor:pointer;padding:0;margin-bottom:20px;display:flex;align-items:center;gap:6px;
+  }
+  .back-btn:hover{color:var(--ink);}
+
+  .reading-pane{
+    display:flex;gap:20px;background:var(--paper-hi);border:1px solid var(--line);
+    border-radius:14px;overflow:hidden;
+  }
+  .pane-ribbon{
+    width:16px;flex-shrink:0;position:relative;background:var(--line);
+  }
+  .pane-ribbon-fill{
+    position:absolute;top:0;left:0;width:100%;background:var(--ribbon);
+    transition:height .3s ease;
+  }
+  .pane-body{padding:26px 30px 22px;flex:1;min-width:0;}
+
+  .book-heading h2{font-family:'Fraunces',serif;font-size:24px;font-weight:600;margin:0 0 4px;}
+  .book-heading p{margin:0;font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--slate);}
+
+  .recap-box{
+    margin:18px 0;padding:14px 16px;background:rgba(166,55,63,0.06);
+    border-left:3px solid var(--ribbon);border-radius:0 8px 8px 0;font-size:13.5px;line-height:1.55;
+  }
+  .recap-box .recap-label{font-family:'IBM Plex Mono',monospace;font-size:11px;text-transform:uppercase;letter-spacing:0.06em;color:var(--ribbon-dim);display:block;margin-bottom:6px;}
+  .recap-ai{margin-top:10px;font-style:italic;color:var(--ink-soft);}
+  .recap-btn{
+    margin-top:10px;background:none;border:1px solid var(--ribbon);color:var(--ribbon-dim);
+    font-family:'Inter',sans-serif;font-size:12.5px;font-weight:600;padding:6px 12px;border-radius:6px;cursor:pointer;
+  }
+  .recap-btn:hover{background:var(--ribbon);color:var(--paper-hi);}
+  .recap-btn:disabled{opacity:0.5;cursor:default;}
+
+  .passage{
+    font-family:'Fraunces',serif;font-size:19px;line-height:1.75;margin:20px 0;
+    min-height:120px;
+  }
+  .passage .prev-line,.passage .next-line{color:var(--slate);opacity:0.55;}
+  .passage .current-line{
+    color:var(--ink);background:rgba(184,147,95,0.22);
+    border-radius:4px;box-shadow:0 0 0 4px rgba(184,147,95,0.22);
+  }
+
+  .transport{display:flex;align-items:center;gap:14px;margin-top:22px;flex-wrap:wrap;}
+  .transport button{
+    background:var(--ink);color:var(--paper-hi);border:none;border-radius:8px;
+    width:40px;height:40px;font-size:15px;cursor:pointer;display:flex;align-items:center;justify-content:center;
+    transition:background .12s ease;
+  }
+  .transport button:hover{background:var(--ink-soft);}
+  .transport .play-pause{width:52px;height:52px;background:var(--ribbon);font-size:18px;}
+  .transport .play-pause:hover{background:var(--ribbon-dim);}
+  .transport-spacer{flex:1;}
+
+  .speed-control,.voice-control{
+    display:flex;align-items:center;gap:6px;font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--slate);
+  }
+  .speed-control input[type=range]{width:80px;accent-color:var(--ribbon);}
+  .voice-control select{
+    font-family:'Inter',sans-serif;font-size:12.5px;background:var(--paper);border:1px solid var(--line);
+    border-radius:6px;padding:5px 8px;max-width:150px;color:var(--ink);
+  }
+
+  .progress-row{display:flex;align-items:center;gap:10px;margin-top:16px;font-family:'IBM Plex Mono',monospace;font-size:11.5px;color:var(--slate);}
+  .progress-row .progress-track{flex:1;height:5px;background:var(--line);border-radius:3px;overflow:hidden;}
+  .progress-row .progress-fill{height:100%;background:var(--moss);}
+
+  @media (max-width:600px){
+    .pane-body{padding:20px 18px;}
+    .passage{font-size:17px;}
+    .shelf-grid{grid-template-columns:repeat(auto-fill,minmax(150px,1fr));}
+  }
+  @media (prefers-reduced-motion:reduce){
+    *{animation-duration:0.001ms !important;transition-duration:0.001ms !important;}
+  }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <div class="app-header">
+    <div class="brand">
+      <div class="brand-mark"></div>
+      <div>
+        <h1>Bookmark</h1>
+        <p id="bookCount">your shelf is empty</p>
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;">
+      <button class="upload-btn" id="settingsBtn" style="background:transparent;color:var(--ink);border:1px solid var(--line);" title="Set your Anthropic API key (for the AI recap feature)">⚙</button>
+      <button class="upload-btn" id="uploadBtn">＋ Add PDFs</button>
+      <input type="file" id="fileInput" accept="application/pdf" multiple>
+    </div>
+  </div>
+
+  <div id="parsingArea"></div>
+
+  <div class="library-view" id="libraryView">
+    <div class="shelf">
+      <p class="shelf-title">Continue listening</p>
+      <div class="shelf-grid" id="continueGrid"></div>
+      <div class="empty-state" id="continueEmpty" style="display:none;">Nothing in progress yet — start a book below and it'll live here.</div>
+    </div>
+    <div class="shelf">
+      <p class="shelf-title">New arrivals</p>
+      <div class="shelf-grid" id="newGrid"></div>
+      <div class="empty-state" id="newEmpty" style="display:none;"><b>Drop in a PDF</b> to get started — I'll turn it into something you can listen to.</div>
+    </div>
+    <div class="shelf" id="finishedShelf" style="display:none;">
+      <p class="shelf-title">Finished</p>
+      <div class="shelf-grid" id="finishedGrid"></div>
+    </div>
+  </div>
+
+  <div class="player" id="playerView">
+    <button class="back-btn" id="backBtn">← back to shelf</button>
+    <div class="reading-pane">
+      <div class="pane-ribbon"><div class="pane-ribbon-fill" id="paneRibbonFill"></div></div>
+      <div class="pane-body">
+        <div class="book-heading">
+          <h2 id="playerTitle">—</h2>
+          <p id="playerMeta">—</p>
+        </div>
+
+        <div class="recap-box" id="recapBox" style="display:none;">
+          <span class="recap-label">Where you left off</span>
+          <span id="recapText"></span>
+          <div id="recapAiWrap">
+            <button class="recap-btn" id="recapBtn">Catch me up on the story</button>
+            <div class="recap-ai" id="recapAiText"></div>
+          </div>
+        </div>
+
+        <div class="passage" id="passage"></div>
+
+        <div class="transport">
+          <button id="prevBtn" title="Previous">⏮</button>
+          <button class="play-pause" id="playPauseBtn" title="Play">▶</button>
+          <button id="nextBtn" title="Next">⏭</button>
+          <div class="transport-spacer"></div>
+          <div class="speed-control">
+            <span>speed</span>
+            <input type="range" id="speedSlider" min="0.6" max="1.8" step="0.1" value="1">
+            <span id="speedLabel">1.0×</span>
+          </div>
+          <div class="voice-control">
+            <span>voice</span>
+            <select id="voiceSelect"></select>
+          </div>
+        </div>
+
+        <div class="progress-row">
+          <span id="progressLabel">0%</span>
+          <div class="progress-track"><div class="progress-fill" id="playerProgressFill"></div></div>
+          <span id="progressCount">0 / 0</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  // ---------------- State ----------------
+  let libraryIndex = [];      // [{id,title,status,progressPercent,lastListenedAt,addedAt,totalParagraphs,currentParagraphIndex}]
+  let currentBook = null;     // full book object currently loaded in player {id,title,paragraphs,currentParagraphIndex,...}
+  let isPlaying = false;
+  let voices = [];
+  let saveTimer = null;
+
+  const $ = (id) => document.getElementById(id);
+
+  if(window.pdfjsLib){
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+  }
+
+  // ---------------- Storage helpers ----------------
+  // Backed by the browser's own localStorage — this runs as a standalone
+  // hosted app (e.g. GitHub Pages), not inside Claude's artifact sandbox,
+  // so data lives on whichever device/browser opened it.
+  async function loadLibraryIndex(){
+    try{
+      const raw = localStorage.getItem('library-index');
+      libraryIndex = raw ? JSON.parse(raw) : [];
+    }catch(e){
+      libraryIndex = [];
+    }
+  }
+  async function saveLibraryIndex(){
+    try{
+      localStorage.setItem('library-index', JSON.stringify(libraryIndex));
+    }catch(e){
+      console.error('Could not save library index', e);
+    }
+  }
+  async function loadBook(id){
+    try{
+      const raw = localStorage.getItem('book:'+id);
+      return raw ? JSON.parse(raw) : null;
+    }catch(e){
+      return null;
+    }
+  }
+  async function saveBook(book){
+    try{
+      localStorage.setItem('book:'+book.id, JSON.stringify(book));
+      return true;
+    }catch(e){
+      console.error('Could not save book (likely storage quota)', e);
+      return false;
+    }
+  }
+  async function deleteBookStorage(id){
+    try{ localStorage.removeItem('book:'+id); }catch(e){}
+  }
+
+  // ---------------- Utilities ----------------
+  function timeAgo(ts){
+    if(!ts) return '';
+    const diff = Date.now() - ts;
+    const mins = Math.floor(diff/60000);
+    if(mins < 1) return 'just now';
+    if(mins < 60) return mins+' min ago';
+    const hrs = Math.floor(mins/60);
+    if(hrs < 24) return hrs+' hr'+(hrs>1?'s':'')+' ago';
+    const days = Math.floor(hrs/24);
+    return days+' day'+(days>1?'s':'')+' ago';
+  }
+
+  function splitIntoParagraphs(rawText){
+    const cleaned = rawText.replace(/\s+/g,' ').trim();
+    const sentences = cleaned.match(/[^.!?]+[.!?]+(\s|$)/g) || [cleaned];
+    const paragraphs = [];
+    let buf = [];
+    let bufLen = 0;
+    for(const s of sentences){
+      buf.push(s.trim());
+      bufLen += s.length;
+      if(bufLen > 260 || buf.length >= 3){
+        paragraphs.push(buf.join(' '));
+        buf = []; bufLen = 0;
+      }
+    }
+    if(buf.length) paragraphs.push(buf.join(' '));
+    return paragraphs.filter(p=>p.length>0);
+  }
+
+  async function extractPdfText(arrayBuffer, onProgress){
+    const pdf = await pdfjsLib.getDocument({data:arrayBuffer}).promise;
+    let fullText = '';
+    for(let i=1;i<=pdf.numPages;i++){
+      const page = await pdf.getPage(i);
+      const content = await page.getTextContent();
+      const pageText = content.items.map(it=>it.str).join(' ');
+      fullText += pageText + '\n\n';
+      if(onProgress) onProgress(i, pdf.numPages);
+    }
+    return fullText;
+  }
+
+  function statusOf(book){
+    if(book.currentParagraphIndex >= book.totalParagraphs - 1 && book.totalParagraphs>0) return 'finished';
+    if(book.currentParagraphIndex > 0) return 'inprogress';
+    return 'unstarted';
+  }
+
+  // ---------------- Library rendering ----------------
+  function renderLibrary(){
+    const continueGrid = $('continueGrid'), newGrid = $('newGrid'), finishedGrid = $('finishedGrid');
+    continueGrid.innerHTML = ''; newGrid.innerHTML = ''; finishedGrid.innerHTML = '';
+
+    const cont = libraryIndex.filter(b=>b.status==='inprogress').sort((a,b)=>(b.lastListenedAt||0)-(a.lastListenedAt||0));
+    const fresh = libraryIndex.filter(b=>b.status==='unstarted').sort((a,b)=>b.addedAt-a.addedAt);
+    const done = libraryIndex.filter(b=>b.status==='finished').sort((a,b)=>(b.lastListenedAt||0)-(a.lastListenedAt||0));
+
+    $('continueEmpty').style.display = cont.length? 'none':'block';
+    $('newEmpty').style.display = fresh.length? 'none':'block';
+    $('finishedShelf').style.display = done.length? 'block':'none';
+
+    cont.forEach(b=>continueGrid.appendChild(bookCard(b)));
+    fresh.forEach(b=>newGrid.appendChild(bookCard(b)));
+    done.forEach(b=>finishedGrid.appendChild(bookCard(b)));
+
+    $('bookCount').textContent = libraryIndex.length
+      ? libraryIndex.length + ' book'+(libraryIndex.length>1?'s':'')+' on your shelf'
+      : 'your shelf is empty';
+  }
+
+  function bookCard(b){
+    const div = document.createElement('div');
+    div.className = 'book-card';
+    const pct = b.totalParagraphs ? Math.round((b.currentParagraphIndex/b.totalParagraphs)*100) : 0;
+    div.innerHTML = `
+      <div class="ribbon-tab" style="height:${Math.max(18, Math.min(46, 18+pct*0.28))}px;"></div>
+      <div class="title">${escapeHtml(b.title)}</div>
+      <p class="meta">${b.status==='finished' ? 'finished · '+timeAgo(b.lastListenedAt) : b.status==='inprogress' ? pct+'% · '+timeAgo(b.lastListenedAt) : 'not started'}</p>
+      <div class="progress-track"><div class="progress-fill" style="width:${pct}%;"></div></div>
+      <button class="delete-x" title="Remove book">✕</button>
+    `;
+    div.querySelector('.delete-x').addEventListener('click',(e)=>{
+      e.stopPropagation();
+      if(confirm('Remove "'+b.title+'" from your shelf?')){
+        removeBook(b.id);
+      }
+    });
+    div.addEventListener('click', ()=>openBook(b.id));
+    return div;
+  }
+
+  function escapeHtml(s){
+    const d = document.createElement('div');
+    d.textContent = s;
+    return d.innerHTML;
+  }
+
+  async function removeBook(id){
+    libraryIndex = libraryIndex.filter(b=>b.id!==id);
+    await saveLibraryIndex();
+    await deleteBookStorage(id);
+    renderLibrary();
+  }
+
+  // ---------------- Upload flow ----------------
+  $('uploadBtn').addEventListener('click', ()=>$('fileInput').click());
+  $('fileInput').addEventListener('change', async (e)=>{
+    const files = Array.from(e.target.files || []);
+    e.target.value = '';
+    for(const file of files){
+      await handleUpload(file);
+    }
+  });
+
+  async function handleUpload(file){
+    const parsingArea = $('parsingArea');
+    const card = document.createElement('div');
+    card.className = 'parsing-card';
+    card.innerHTML = `<div class="spinner"></div><span>Turning pages on "${escapeHtml(file.name)}"…</span>`;
+    parsingArea.appendChild(card);
+
+    try{
+      const arrayBuffer = await file.arrayBuffer();
+      const rawText = await extractPdfText(arrayBuffer, (i,total)=>{
+        card.querySelector('span').textContent = `Turning pages on "${file.name}" — page ${i} of ${total}`;
+      });
+      const paragraphs = splitIntoParagraphs(rawText);
+      if(paragraphs.length === 0){
+        card.innerHTML = `<span>Couldn't find readable text in "${escapeHtml(file.name)}" — it may be a scanned image PDF.</span>`;
+        setTimeout(()=>card.remove(), 4000);
+        return;
+      }
+      const id = (crypto.randomUUID ? crypto.randomUUID() : 'b'+Date.now()+Math.random());
+      const title = file.name.replace(/\.pdf$/i,'');
+      const book = {
+        id, title, paragraphs,
+        totalParagraphs: paragraphs.length,
+        currentParagraphIndex: 0,
+        addedAt: Date.now(),
+        lastListenedAt: null,
+        status: 'unstarted'
+      };
+      const ok = await saveBook(book);
+      if(!ok){
+        card.innerHTML = `<span>"${escapeHtml(file.name)}" was too large to save. Try a shorter book.</span>`;
+        setTimeout(()=>card.remove(), 4000);
+        return;
+      }
+      libraryIndex.push({
+        id, title, status:'unstarted', progressPercent:0,
+        lastListenedAt:null, addedAt: book.addedAt,
+        totalParagraphs: paragraphs.length, currentParagraphIndex:0
+      });
+      await saveLibraryIndex();
+      renderLibrary();
+      card.remove();
+    }catch(err){
+      console.error(err);
+      card.innerHTML = `<span>Something went wrong reading "${escapeHtml(file.name)}".</span>`;
+      setTimeout(()=>card.remove(), 4000);
+    }
+  }
+
+  // ---------------- Player ----------------
+  async function openBook(id){
+    stopSpeaking();
+    const book = await loadBook(id);
+    if(!book){ alert('Could not load that book.'); return; }
+    currentBook = book;
+    $('libraryView').classList.add('hidden');
+    $('playerView').classList.add('active');
+    renderPlayerHeader();
+    renderRecap();
+    renderPassage();
+    updateProgressUI();
+  }
+
+  $('backBtn').addEventListener('click', async ()=>{
+    stopSpeaking();
+    await flushProgress();
+    $('playerView').classList.remove('active');
+    $('libraryView').classList.remove('hidden');
+    await loadLibraryIndex();
+    renderLibrary();
+  });
+
+  function renderPlayerHeader(){
+    $('playerTitle').textContent = currentBook.title;
+    const pct = Math.round((currentBook.currentParagraphIndex/currentBook.totalParagraphs)*100);
+    $('playerMeta').textContent = pct+'% through · '+currentBook.totalParagraphs+' passages';
+    $('paneRibbonFill').style.height = pct+'%';
+  }
+
+  function renderRecap(){
+    const box = $('recapBox');
+    if(currentBook.currentParagraphIndex === 0 || !currentBook.lastListenedAt){
+      box.style.display = 'none';
+      return;
+    }
+    box.style.display = 'block';
+    const idx = currentBook.currentParagraphIndex;
+    const prevSnippet = currentBook.paragraphs[Math.max(0, idx-1)];
+    $('recapText').textContent = 'You stopped '+timeAgo(currentBook.lastListenedAt)+', right after: "'+
+      (prevSnippet.length>160 ? prevSnippet.slice(0,160)+'…' : prevSnippet) + '"';
+    $('recapAiText').textContent = '';
+    $('recapBtn').disabled = false;
+    $('recapBtn').textContent = 'Catch me up on the story';
+  }
+
+  $('settingsBtn').addEventListener('click', ()=>{
+    const current = localStorage.getItem('anthropic-api-key') || '';
+    const key = prompt("Paste your Anthropic API key (used only for the 'Catch me up' recap feature, stored on this device only).\n\nGet one at console.anthropic.com → API Keys.", current);
+    if(key !== null){
+      if(key.trim()) localStorage.setItem('anthropic-api-key', key.trim());
+      else localStorage.removeItem('anthropic-api-key');
+    }
+  });
+
+  $('recapBtn').addEventListener('click', async ()=>{
+    const btn = $('recapBtn');
+    const apiKey = localStorage.getItem('anthropic-api-key');
+    if(!apiKey){
+      $('recapAiText').textContent = "Add your Anthropic API key first — tap the ⚙ button at the top.";
+      return;
+    }
+    btn.disabled = true;
+    btn.textContent = 'Thinking back…';
+    const idx = currentBook.currentParagraphIndex;
+    const startIdx = Math.max(0, idx - 25);
+    const contextText = currentBook.paragraphs.slice(startIdx, idx).join(' ').slice(-4000);
+    try{
+      const response = await fetch("https://api.anthropic.com/v1/messages", {
+        method:"POST",
+        headers:{
+          "Content-Type":"application/json",
+          "x-api-key": apiKey,
+          "anthropic-version": "2023-06-01",
+          "anthropic-dangerous-direct-browser-access": "true"
+        },
+        body: JSON.stringify({
+          model:"claude-sonnet-5",
+          max_tokens:1000,
+          messages:[{
+            role:"user",
+            content:"Here is the most recent portion of a book someone is listening to, right up to where they paused:\n\n"+contextText+"\n\nIn 3-4 warm, conversational sentences, remind them what's just happened in the story so they can pick back up. Don't mention that this is an excerpt or discuss the text as a document — just recap the story itself, like a friend catching them up."
+          }]
+        })
+      });
+      if(!response.ok){
+        const errData = await response.json().catch(()=>({}));
+        throw new Error(errData?.error?.message || ('HTTP '+response.status));
+      }
+      const data = await response.json();
+      const text = (data.content||[]).map(c=>c.text||'').join(' ').trim();
+      $('recapAiText').textContent = text || "Couldn't put together a recap right now.";
+    }catch(e){
+      $('recapAiText').textContent = "Recap failed: "+e.message;
+    }
+    btn.disabled = false;
+    btn.textContent = 'Catch me up on the story';
+  });
+
+  function renderPassage(){
+    const idx = currentBook.currentParagraphIndex;
+    const p = currentBook.paragraphs;
+    const parts = [];
+    if(idx>0) parts.push('<span class="prev-line">'+escapeHtml(p[idx-1])+'</span>');
+    parts.push('<span class="current-line" id="currentLineSpan">'+escapeHtml(p[idx] || '')+'</span>');
+    if(idx < p.length-1) parts.push('<span class="next-line">'+escapeHtml(p[idx+1])+'</span>');
+    $('passage').innerHTML = parts.join(' ');
+    const cur = $('currentLineSpan');
+    if(cur) cur.scrollIntoView({block:'center', behavior:'smooth'});
+  }
+
+  function updateProgressUI(){
+    const idx = currentBook.currentParagraphIndex;
+    const total = currentBook.totalParagraphs;
+    const pct = total ? Math.round((idx/total)*100) : 0;
+    $('progressLabel').textContent = pct+'%';
+    $('progressCount').textContent = idx+' / '+total;
+    $('playerProgressFill').style.width = pct+'%';
+    $('paneRibbonFill').style.height = pct+'%';
+  }
+
+  // ---------------- Speech ----------------
+  function populateVoices(){
+    voices = speechSynthesis.getVoices();
+    const sel = $('voiceSelect');
+    const prevValue = sel.value;
+    sel.innerHTML = '';
+    voices.filter(v=>v.lang.startsWith('en')).concat(voices.filter(v=>!v.lang.startsWith('en')))
+      .forEach((v,i)=>{
+        const opt = document.createElement('option');
+        opt.value = v.name;
+        opt.textContent = v.name + ' ('+v.lang+')';
+        sel.appendChild(opt);
+      });
+    if(prevValue) sel.value = prevValue;
+  }
+  if('speechSynthesis' in window){
+    speechSynthesis.onvoiceschanged = populateVoices;
+    populateVoices();
+  }
+
+  function speakCurrentParagraph(){
+    if(!currentBook) return;
+    const text = currentBook.paragraphs[currentBook.currentParagraphIndex];
+    if(text === undefined){ stopSpeaking(); return; }
+    speechSynthesis.cancel();
+    const utter = new SpeechSynthesisUtterance(text);
+    const voiceName = $('voiceSelect').value;
+    const chosen = voices.find(v=>v.name===voiceName);
+    if(chosen) utter.voice = chosen;
+    utter.rate = parseFloat($('speedSlider').value);
+    utter.onend = ()=>{
+      if(!isPlaying) return;
+      advance(1, true);
+    };
+    speechSynthesis.speak(utter);
+  }
+
+  function stopSpeaking(){
+    isPlaying = false;
+    speechSynthesis.cancel();
+    $('playPauseBtn').textContent = '▶';
+  }
+
+  $('playPauseBtn').addEventListener('click', ()=>{
+    if(!currentBook) return;
+    if(isPlaying){
+      stopSpeaking();
+    }else{
+      isPlaying = true;
+      $('playPauseBtn').textContent = '⏸';
+      markStarted();
+      speakCurrentParagraph();
+    }
+  });
+
+  $('prevBtn').addEventListener('click', ()=>advance(-1, false));
+  $('nextBtn').addEventListener('click', ()=>advance(1, false));
+
+  function advance(dir, autoContinue){
+    if(!currentBook) return;
+    const wasPlaying = isPlaying;
+    speechSynthesis.cancel();
+    currentBook.currentParagraphIndex = Math.max(0, Math.min(currentBook.totalParagraphs-1, currentBook.currentParagraphIndex + dir));
+    currentBook.lastListenedAt = Date.now();
+    renderPassage();
+    updateProgressUI();
+    renderPlayerHeader();
+    scheduleSave();
+    if(currentBook.currentParagraphIndex >= currentBook.totalParagraphs-1){
+      isPlaying = false;
+      $('playPauseBtn').textContent = '▶';
+      return;
+    }
+    if(autoContinue && wasPlaying){
+      isPlaying = true;
+      speakCurrentParagraph();
+    }
+  }
+
+  function markStarted(){
+    currentBook.lastListenedAt = Date.now();
+    scheduleSave();
+  }
+
+  $('speedSlider').addEventListener('input', ()=>{
+    $('speedLabel').textContent = parseFloat($('speedSlider').value).toFixed(1)+'×';
+  });
+
+  // ---------------- Saving progress ----------------
+  function scheduleSave(){
+    if(saveTimer) clearTimeout(saveTimer);
+    saveTimer = setTimeout(flushProgress, 1500);
+  }
+
+  async function flushProgress(){
+    if(!currentBook) return;
+    currentBook.status = statusOf(currentBook);
+    await saveBook(currentBook);
+    const idxEntry = libraryIndex.find(b=>b.id===currentBook.id);
+    if(idxEntry){
+      idxEntry.currentParagraphIndex = currentBook.currentParagraphIndex;
+      idxEntry.lastListenedAt = currentBook.lastListenedAt;
+      idxEntry.status = currentBook.status;
+      await saveLibraryIndex();
+    }
+  }
+
+  window.addEventListener('beforeunload', ()=>{ if(currentBook) flushProgress(); });
+
+  // ---------------- Init ----------------
+  (async function init(){
+    await loadLibraryIndex();
+    renderLibrary();
+  })();
+
+})();
+</script>
+</body>
+</html>
